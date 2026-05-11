@@ -39,6 +39,18 @@ class PredictionCache:
     
     Automatically invalidates when model version changes.
     """
+    def _cleanup_expired(self) -> None:
+        """
+        Remove all expired entries from the cache.
+        """
+        current_time = time.time()
+        keys_to_delete = [
+            key for key, entry in self.cache.items()
+            if current_time - entry["cached_at"] > self.ttl_seconds
+        ]
+
+        for key in keys_to_delete:
+            del self.cache[key]
     
     def __init__(self, max_size: int = 10000, ttl_seconds: int = 3600):
         """
@@ -125,18 +137,15 @@ class PredictionCache:
     def set(self, text: str, model_version: str, result: Dict[str, Any]) -> None:
         """
         Store prediction result in cache.
-        
-        Args:
-            text: Email text content
-            model_version: Current model version
-            result: Prediction result dict to cache
         """
         cache_key = self._generate_cache_key(text, model_version)
-        
+
         with self.lock:
+        
+            self._cleanup_expired()
+
             # Check if we need to evict (LRU)
             if len(self.cache) >= self.max_size and cache_key not in self.cache:
-                # Remove oldest entry
                 self.cache.popitem(last=False)
                 self.evictions += 1
             
