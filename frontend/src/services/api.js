@@ -9,9 +9,17 @@
 const isProd = import.meta.env.MODE === 'production';
 
 const logger = {
-  log: (...args) => { if (!isProd)logger.log(...args); },
-  warn: (...args) => { if (!isProd) logger.warn(...args); },
-  error: (...args) => logger.error(...args), // always show errors
+  log: (...args) => {
+    if (!isProd) console.log(...args);
+  },
+
+  warn: (...args) => {
+    if (!isProd) console.warn(...args);
+  },
+
+  error: (...args) => {
+    console.error(...args);
+  },
 };
 
 import { z } from 'zod';
