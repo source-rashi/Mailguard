@@ -24,14 +24,20 @@ jobs:
       - name: Run unit tests
         working-directory: ./backend
         run: npm test -- --testPathPattern=unit
+        env:
+          ENCRYPTION_KEY: test-encryption-key-32-characters
 
       - name: Run integration tests
         working-directory: ./backend
         run: npm test -- --testPathPattern=integration
+        env:
+          ENCRYPTION_KEY: test-encryption-key-32-characters
 
       - name: Generate coverage
         working-directory: ./backend
         run: npm run test:coverage
+        env:
+          ENCRYPTION_KEY: test-encryption-key-32-characters
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -100,7 +106,7 @@ jobs:
       - name: Generate coverage
         working-directory: ./ml-service
         run: PYTHONPATH=. pytest --cov=. --cov-report=xml
-        
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
