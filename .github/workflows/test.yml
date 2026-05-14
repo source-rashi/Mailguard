@@ -79,13 +79,13 @@ jobs:
           pip install pytest-cov httpx
       - name: Run unit tests
         working-directory: ./ml-service
-        run: pytest -m unit -v
+        run: PYTHONPATH=. pytest -m unit -v
       - name: Run integration tests
         working-directory: ./ml-service
-        run: pytest -m integration -v
+        run: PYTHONPATH=. pytest -m integration -v
       - name: Generate coverage
         working-directory: ./ml-service
-        run: pytest --cov=. --cov-report=xml
+        run: PYTHONPATH=. pytest --cov=. --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
