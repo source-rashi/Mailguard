@@ -33,7 +33,7 @@ const errorHandler = (err, req, res, next) => {
 
   // Determine status code
   // Use error's statusCode if available, otherwise default to 500
-  const statusCode = err.statusCode || res.statusCode || 500;
+  const statusCode = err.statusCode || (res.statusCode !== 200? res.statusCode : 500);
 
   // Prepare error response (never include sensitive data)
   const errorResponse = {
