@@ -11,7 +11,7 @@ const router = express.Router();
  */
 router.get('/preferences', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -42,7 +42,7 @@ router.put('/preferences', authMiddleware, async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.user.id,
+      req.userId,
       {
         'autoDeletePreferences.enabled': enabled !== undefined ? enabled : false,
         'autoDeletePreferences.retentionDays': retentionDays || 30,
