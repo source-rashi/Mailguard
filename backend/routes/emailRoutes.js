@@ -16,6 +16,30 @@ const { invalidateAnalyticsCache } = require('../middleware/analyticsCache');
 router.use(authMiddleware);
 router.use(syncUserMiddleware);
 
+/**
+ * GET /api/emails/csrf-token
+ * Issue a CSRF token for subsequent mutations on email routes
+ * Required before making POST/PUT/DELETE requests
+ */
+router.get('/csrf-token', (req, res) => {
+  try {
+    // Generate CSRF token using the csurf middleware token method
+    const token = req.csrfToken();
+
+    res.json({
+      success: true,
+      csrfToken: token,
+      message: 'CSRF token issued successfully. Use this token in X-CSRF-Token header for mutations.'
+    });
+  } catch (error) {
+    console.error('Error generating CSRF token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate CSRF token'
+    });
+  }
+});
+
 // Classify all unclassified emails
 // INVALIDATES: User cache and analytics cache after classification completes
 router.post('/classify', csrfProtection,
