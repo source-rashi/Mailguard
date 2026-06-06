@@ -14,23 +14,21 @@ const { getCacheStats, flushCache, invalidateCacheMiddleware } = require('../mid
 // Basic auth for all admin routes
 router.use(authMiddleware);
 router.use(syncUserMiddleware);
+router.use(adminAuth);
 
 /**
  * GET /api/admin/cache/stats
  * Get cache performance statistics
- * 🔐 Explicit admin protection
+ * 🔐 Admin protected
  */
-router.get('/cache/stats', adminAuth, getCacheStats);
+router.get('/cache/stats', getCacheStats);
 
 /**
  * POST /api/admin/cache/flush
  * Flush all cached data
- * 🔐 Explicit admin protection
+ * 🔐 Admin protected
  */
-router.post('/cache/flush', adminAuth, adminOperationLimiter, flushCache);
-
-// All remaining routes require admin role
-router.use(adminAuth);
+router.post('/cache/flush', adminOperationLimiter, flushCache);
 
 /**
  * POST /api/admin/retrain
