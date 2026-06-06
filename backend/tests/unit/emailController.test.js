@@ -39,6 +39,7 @@ const app = require('../../server');
 const Email = require('../../models/Email');
 const User = require('../../models/User');
 const Classification = require('../../models/Classification');
+const cache = require('../../utils/cache');
 
 describe('Email Controller - Unit Tests', () => {
   beforeAll(() => {
@@ -48,6 +49,9 @@ describe('Email Controller - Unit Tests', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Flush in-memory cache so that cached 200 responses from prior tests
+    // do not mask controller errors (e.g. DB failures) in subsequent tests.
+    cache.flush();
   });
 
   beforeEach(() => {
