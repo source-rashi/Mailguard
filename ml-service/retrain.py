@@ -43,9 +43,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
-    accuracy_score, 
-    precision_score, 
-    recall_score, 
+    accuracy_score,
+    precision_score,
+    recall_score,
     f1_score,
     classification_report,
     confusion_matrix
@@ -58,7 +58,7 @@ warnings.filterwarnings('ignore')
 
 class ModelRetrainer:
     """Handles model retraining pipeline"""
-    
+
     def __init__(self, data_file='training.csv', model_type='random_forest', test_size=0.2):
         """
         Initialize retrainer
@@ -71,31 +71,31 @@ class ModelRetrainer:
         # Support Docker volume paths via environment variables
         model_dir = os.getenv('MODEL_DIR', '.')
         dataset_dir = os.getenv('DATASET_DIR', '.')
-        
+
         # Resolve data file path (use dataset_dir if relative path)
         if not os.path.isabs(data_file):
             self.data_file = os.path.join(dataset_dir, data_file)
         else:
             self.data_file = data_file
-            
+
         self.model_type = model_type
         self.test_size = test_size
-        
+
         # Model paths (save to MODEL_DIR for Docker volume persistence)
         self.vectorizer_path = os.path.join(model_dir, 'vectorizer.pkl')
         self.model_path = os.path.join(model_dir, 'phishing_model.pkl')
         self.metadata_path = os.path.join(model_dir, 'model_metadata.json')
-        
+
         # Data placeholders
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
-        
+
         # Model components
         self.vectorizer = None
         self.model = None
-        
+
     def load_data(self):
         """
         Load training data from CSV file
@@ -106,46 +106,46 @@ class ModelRetrainer:
         print("=" * 60)
         print("STEP 1: Loading Training Data")
         print("=" * 60 + "\n")
-        
+
         try:
             print(f"Loading data from: {self.data_file}")
-            
+
             if not os.path.exists(self.data_file):
                 print(f"ERROR: File not found: {self.data_file}")
                 print("\nPlease run dataset_builder.py first:")
                 print("  python dataset_builder.py")
                 return False
-            
+
             # Read CSV
             df = pd.read_csv(self.data_file)
-            
+
             # Check required columns
             if 'text' not in df.columns or 'label' not in df.columns:
                 print("ERROR: CSV must have 'text' and 'label' columns")
                 return False
-            
+
             print(f"SUCCESS: Loaded {len(df)} samples\n")
-            
+
             # Show label distribution
             label_counts = df['label'].value_counts()
             print("Label Distribution:")
             for label, count in label_counts.items():
                 percentage = (count / len(df)) * 100
                 print(f"  - {label}: {count} ({percentage:.1f}%)")
-            
+
             # Check for class imbalance
             min_class = label_counts.min()
             max_class = label_counts.max()
             imbalance_ratio = max_class / min_class if min_class > 0 else float('inf')
-            
+
             if imbalance_ratio > 3:
                 print(f"\nWARNING: Significant class imbalance detected (ratio: {imbalance_ratio:.1f}:1)")
                 print("Consider collecting more data for the minority class")
-            
+
             # Remove any NaN values
             df = df.dropna(subset=['text', 'label'])
             print(f"\nFinal dataset size: {len(df)} samples")
-            
+
             # Check minimum dataset size
             MIN_SAMPLES = 10  # Minimum samples required for meaningful training
             if len(df) < MIN_SAMPLES:
@@ -157,7 +157,7 @@ class ModelRetrainer:
                 print("  2. Submit more feedback corrections")
                 print("  3. Run dataset_builder.py again")
                 return False
-            
+
             # Map labels to numeric (0=legitimate/safe, 1=phishing)
             label_mapping = {
                 'legitimate': 0,
@@ -165,9 +165,9 @@ class ModelRetrainer:
                 'phishing': 1,
                 'spam': 1
             }
-            
+
             df['label_numeric'] = df['label'].map(label_mapping)
-            
+
             # Check for unmapped labels
             unmapped = df['label_numeric'].isna().sum()
             if unmapped > 0:
@@ -176,12 +176,12 @@ class ModelRetrainer:
                 print(f"Unknown labels: {list(unique_labels)}")
                 df = df.dropna(subset=['label_numeric'])
                 print(f"Proceeding with {len(df)} valid samples")
-            
+
             # Check minimum samples per class for stratified split
             class_counts = df['label_numeric'].value_counts()
             min_class_count = class_counts.min()
             MIN_SAMPLES_PER_CLASS = 2  # Minimum for stratified split
-            
+
             if min_class_count < MIN_SAMPLES_PER_CLASS:
                 print(f"\nERROR: Insufficient samples for stratified split")
                 print(f"  Class distribution:")
@@ -191,28 +191,28 @@ class ModelRetrainer:
                 print(f"\n  Minimum required per class: {MIN_SAMPLES_PER_CLASS}")
                 print("\nPlease collect more diverse data (both phishing and legitimate emails)")
                 return False
-            
+
             # Split data
             print(f"\nSplitting data (test size: {self.test_size*100:.0f}%)...")
             X = df['text'].values
             y = df['label_numeric'].values
-            
+
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-                X, y, 
-                test_size=self.test_size, 
+                X, y,
+                test_size=self.test_size,
                 random_state=42,
                 stratify=y  # Maintain class distribution
             )
-            
+
             print(f"  Training set: {len(self.X_train)} samples")
             print(f"  Test set: {len(self.X_test)} samples")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"ERROR loading data: {e}")
             return False
-    
+
     def create_vectorizer(self):
         """
         Create and fit TF-IDF vectorizer
@@ -223,10 +223,10 @@ class ModelRetrainer:
         print("\n" + "=" * 60)
         print("STEP 2: Creating TF-IDF Vectorizer")
         print("=" * 60 + "\n")
-        
+
         try:
             print("Creating TF-IDF vectorizer...")
-            
+
             # Create vectorizer with optimized parameters
             self.vectorizer = TfidfVectorizer(
                 max_features=5000,        # Limit vocabulary size
@@ -238,23 +238,23 @@ class ModelRetrainer:
                 lowercase=True,            # Convert to lowercase
                 sublinear_tf=True          # Use logarithmic term frequency
             )
-            
+
             print("Fitting vectorizer on training data...")
             X_train_vectorized = self.vectorizer.fit_transform(self.X_train)
-            
+
             # Get vocabulary statistics
             vocab_size = len(self.vectorizer.vocabulary_)
             print(f"\nVectorizer Statistics:")
             print(f"  Vocabulary size: {vocab_size:,} terms")
             print(f"  Training matrix shape: {X_train_vectorized.shape}")
             print(f"  Sparsity: {(1 - X_train_vectorized.nnz / (X_train_vectorized.shape[0] * X_train_vectorized.shape[1])) * 100:.2f}%")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"ERROR creating vectorizer: {e}")
             return False
-    
+
     def train_model(self):
         """
         Train the classification model
@@ -265,12 +265,12 @@ class ModelRetrainer:
         print("\n" + "=" * 60)
         print(f"STEP 3: Training {self.model_type.upper()} Model")
         print("=" * 60 + "\n")
-        
+
         try:
             # Transform training data
             print("Transforming training data...")
             X_train_vectorized = self.vectorizer.transform(self.X_train)
-            
+
             # Create model based on type
             if self.model_type == 'random_forest':
                 print("Creating Random Forest classifier...")
@@ -294,24 +294,24 @@ class ModelRetrainer:
             else:
                 print(f"ERROR: Unknown model type: {self.model_type}")
                 return False
-            
+
             # Train model
             print(f"Training {self.model_type} model...")
             print("This may take a few moments...\n")
-            
+
             start_time = datetime.now()
             self.model.fit(X_train_vectorized, self.y_train)
             end_time = datetime.now()
-            
+
             training_time = (end_time - start_time).total_seconds()
             print(f"SUCCESS: Model trained in {training_time:.2f} seconds")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"ERROR training model: {e}")
             return False
-    
+
     def evaluate_model(self):
         """
         Evaluate model performance on test set
@@ -322,29 +322,28 @@ class ModelRetrainer:
         print("\n" + "=" * 60)
         print("STEP 4: Evaluating Model Performance")
         print("=" * 60 + "\n")
-        
+
         try:
             # Transform test data
             X_test_vectorized = self.vectorizer.transform(self.X_test)
-            
+
             # Make predictions
             print("Making predictions on test set...")
             y_pred = self.model.predict(X_test_vectorized)
-            y_pred_proba = self.model.predict_proba(X_test_vectorized)
-            
+
             # Calculate metrics
             accuracy = accuracy_score(self.y_test, y_pred)
             precision = precision_score(self.y_test, y_pred, zero_division=0)
             recall = recall_score(self.y_test, y_pred, zero_division=0)
             f1 = f1_score(self.y_test, y_pred, zero_division=0)
-            
+
             # Print results
             print("Performance Metrics:")
             print(f"  Accuracy:  {accuracy*100:.2f}%")
             print(f"  Precision: {precision*100:.2f}% (of predicted phishing, how many are correct)")
             print(f"  Recall:    {recall*100:.2f}% (of actual phishing, how many detected)")
             print(f"  F1-Score:  {f1*100:.2f}% (harmonic mean of precision & recall)")
-            
+
             # Confusion matrix
             cm = confusion_matrix(self.y_test, y_pred)
             print("\nConfusion Matrix:")
@@ -352,20 +351,20 @@ class ModelRetrainer:
             print("              Legit  Phish")
             print(f"Actual Legit   {cm[0][0]:4d}   {cm[0][1]:4d}")
             print(f"       Phish   {cm[1][0]:4d}   {cm[1][1]:4d}")
-            
+
             # Classification report
             print("\nDetailed Classification Report:")
             print(classification_report(
-                self.y_test, 
+                self.y_test,
                 y_pred,
                 target_names=['Legitimate', 'Phishing'],
                 zero_division=0
             ))
-            
+
             # Feature importance (if Random Forest)
             if self.model_type == 'random_forest':
                 self._show_feature_importance()
-            
+
             metrics = {
                 'accuracy': accuracy,
                 'precision': precision,
@@ -373,31 +372,31 @@ class ModelRetrainer:
                 'f1_score': f1,
                 'confusion_matrix': cm.tolist()
             }
-            
+
             return metrics
-            
+
         except Exception as e:
             print(f"ERROR evaluating model: {e}")
             return None
-    
+
     def _show_feature_importance(self, top_n=20):
         """Show most important features for Random Forest"""
         try:
             print(f"\nTop {top_n} Most Important Features:")
-            
+
             # Get feature importances
             importances = self.model.feature_importances_
             feature_names = self.vectorizer.get_feature_names_out()
-            
+
             # Sort by importance
             indices = np.argsort(importances)[::-1][:top_n]
-            
+
             for i, idx in enumerate(indices, 1):
                 print(f"  {i:2d}. {feature_names[idx]:20s} ({importances[idx]:.4f})")
-                
+
         except Exception as e:
             print(f"Could not show feature importance: {e}")
-    
+
     def save_models(self, metrics=None):
         """
         Save trained models and metadata to disk
@@ -411,26 +410,26 @@ class ModelRetrainer:
         print("\n" + "=" * 60)
         print("STEP 5: Saving Models and Metadata")
         print("=" * 60 + "\n")
-        
+
         try:
             # Save vectorizer
             print(f"Saving vectorizer to: {self.vectorizer_path}")
             joblib.dump(self.vectorizer, self.vectorizer_path)
             vectorizer_size = os.path.getsize(self.vectorizer_path) / 1024  # KB
             print(f"SUCCESS: Vectorizer saved ({vectorizer_size:.1f} KB)")
-            
+
             # Save model
             print(f"\nSaving model to: {self.model_path}")
             joblib.dump(self.model, self.model_path)
             model_size = os.path.getsize(self.model_path) / 1024  # KB
             print(f"SUCCESS: Model saved ({model_size:.1f} KB)")
-            
+
             # NEW: Save metadata
             print(f"\nSaving metadata to: {self.metadata_path}")
-            
+
             # Generate version from timestamp
             version = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
+
             metadata = {
                 "version": version,
                 "trained_at": datetime.now().isoformat(),
@@ -439,36 +438,36 @@ class ModelRetrainer:
                 "test_samples": len(self.X_test),
                 "vocabulary_size": len(self.vectorizer.vocabulary_)
             }
-            
+
             # Add metrics if provided
             if metrics:
                 metadata["accuracy"] = float(metrics.get('accuracy', 0))
                 metadata["precision"] = float(metrics.get('precision', 0))
                 metadata["recall"] = float(metrics.get('recall', 0))
                 metadata["f1_score"] = float(metrics.get('f1_score', 0))
-            
+
             # Write metadata JSON
             import json
             with open(self.metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=2)
-            
+
             metadata_size = os.path.getsize(self.metadata_path) / 1024  # KB
             print(f"SUCCESS: Metadata saved ({metadata_size:.1f} KB)")
             print(f"  Version: {version}")
             if metrics:
                 print(f"  Accuracy: {metadata['accuracy']*100:.2f}%")
-            
+
             print("\nModel files ready for deployment:")
             print(f"  - {self.vectorizer_path}")
             print(f"  - {self.model_path}")
             print(f"  - {self.metadata_path}")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"ERROR saving models: {e}")
             return False
-    
+
     def retrain_pipeline(self):
         """
         Execute complete retraining pipeline
@@ -483,28 +482,28 @@ class ModelRetrainer:
         print(f"Model type: {self.model_type}")
         print(f"Data file: {self.data_file}")
         print()
-        
+
         # Step 1: Load data
         if not self.load_data():
             return False
-        
+
         # Step 2: Create vectorizer
         if not self.create_vectorizer():
             return False
-        
+
         # Step 3: Train model
         if not self.train_model():
             return False
-        
+
         # Step 4: Evaluate model
         metrics = self.evaluate_model()
         if metrics is None:
             return False
-        
+
         # Step 5: Save models with metrics
         if not self.save_models(metrics):
             return False
-        
+
         # Success
         print("\n" + "=" * 60)
         print("RETRAINING COMPLETED SUCCESSFULLY!")
@@ -518,7 +517,7 @@ class ModelRetrainer:
         print("  2. Test predictions with new model")
         print("  3. Monitor performance in production")
         print()
-        
+
         return True
 
 
@@ -546,19 +545,19 @@ def main():
         default=0.2,
         help='Proportion of data for testing (default: 0.2)'
     )
-    
+
     args = parser.parse_args()
-    
+
     # Create retrainer
     retrainer = ModelRetrainer(
         data_file=args.data,
         model_type=args.model,
         test_size=args.test_size
     )
-    
+
     # Run retraining pipeline
     success = retrainer.retrain_pipeline()
-    
+
     # Exit with appropriate code
     sys.exit(0 if success else 1)
 
