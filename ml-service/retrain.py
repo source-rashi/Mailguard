@@ -330,7 +330,7 @@ class ModelRetrainer:
             # Make predictions
             print("Making predictions on test set...")
             y_pred = self.model.predict(X_test_vectorized)
-
+            
             # Calculate metrics
             accuracy = accuracy_score(self.y_test, y_pred)
             precision = precision_score(self.y_test, y_pred, zero_division=0)
