@@ -23,6 +23,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import joblib
+import traceback
 from datetime import datetime
 
 # Fix Windows console encoding for Unicode characters
@@ -211,6 +212,8 @@ class ModelRetrainer:
             
         except Exception as e:
             print(f"ERROR loading data: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
             return False
     
     def create_vectorizer(self):
@@ -253,6 +256,8 @@ class ModelRetrainer:
             
         except Exception as e:
             print(f"ERROR creating vectorizer: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
             return False
     
     def train_model(self):
@@ -310,6 +315,8 @@ class ModelRetrainer:
             
         except Exception as e:
             print(f"ERROR training model: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
             return False
     
     def evaluate_model(self):
@@ -330,7 +337,6 @@ class ModelRetrainer:
             # Make predictions
             print("Making predictions on test set...")
             y_pred = self.model.predict(X_test_vectorized)
-            y_pred_proba = self.model.predict_proba(X_test_vectorized)
             
             # Calculate metrics
             accuracy = accuracy_score(self.y_test, y_pred)
@@ -378,6 +384,8 @@ class ModelRetrainer:
             
         except Exception as e:
             print(f"ERROR evaluating model: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
             return None
     
     def _show_feature_importance(self, top_n=20):
@@ -397,6 +405,8 @@ class ModelRetrainer:
                 
         except Exception as e:
             print(f"Could not show feature importance: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
     
     def save_models(self, metrics=None):
         """
@@ -467,6 +477,8 @@ class ModelRetrainer:
             
         except Exception as e:
             print(f"ERROR saving models: {e}")
+            print("\nFull Traceback:")
+            traceback.print_exc()
             return False
     
     def retrain_pipeline(self):
@@ -524,43 +536,50 @@ class ModelRetrainer:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description='Retrain phishing detection model'
-    )
-    parser.add_argument(
-        '--data',
-        type=str,
-        default='training.csv',
-        help='Path to training data CSV (default: training.csv)'
-    )
-    parser.add_argument(
-        '--model',
-        type=str,
-        default='random_forest',
-        choices=['random_forest', 'logistic'],
-        help='Model type to train (default: random_forest)'
-    )
-    parser.add_argument(
-        '--test-size',
-        type=float,
-        default=0.2,
-        help='Proportion of data for testing (default: 0.2)'
-    )
-    
-    args = parser.parse_args()
-    
-    # Create retrainer
-    retrainer = ModelRetrainer(
-        data_file=args.data,
-        model_type=args.model,
-        test_size=args.test_size
-    )
-    
-    # Run retraining pipeline
-    success = retrainer.retrain_pipeline()
-    
-    # Exit with appropriate code
-    sys.exit(0 if success else 1)
+    try:
+        parser = argparse.ArgumentParser(
+            description='Retrain phishing detection model'
+        )
+        parser.add_argument(
+            '--data',
+            type=str,
+            default='training.csv',
+            help='Path to training data CSV (default: training.csv)'
+        )
+        parser.add_argument(
+            '--model',
+            type=str,
+            default='random_forest',
+            choices=['random_forest', 'logistic'],
+            help='Model type to train (default: random_forest)'
+        )
+        parser.add_argument(
+            '--test-size',
+            type=float,
+            default=0.2,
+            help='Proportion of data for testing (default: 0.2)'
+        )
+        
+        args = parser.parse_args()
+        
+        # Create retrainer
+        retrainer = ModelRetrainer(
+            data_file=args.data,
+            model_type=args.model,
+            test_size=args.test_size
+        )
+        
+        # Run retraining pipeline
+        success = retrainer.retrain_pipeline()
+        
+        # Exit with appropriate code
+        sys.exit(0 if success else 1)
+        
+    except Exception as e:
+        print(f"ERROR in main: {e}")
+        print("\nFull Traceback:")
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
