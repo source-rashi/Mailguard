@@ -49,6 +49,9 @@ describe('Email Controller - Unit Tests', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Flush in-memory cache so that cached 200 responses from prior tests
+    // do not mask controller errors (e.g. DB failures) in subsequent tests.
+    cache.flush();
   });
 
   beforeEach(() => {
