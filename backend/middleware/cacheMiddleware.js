@@ -66,11 +66,10 @@ function cacheMiddleware(options = {}) {
     if (cachedResponse) {
       // Cache HIT - Return cached response
       console.log(`⚡ Cache HIT - Serving cached response for: ${req.path}`);
-      
-      // Add cache header
+
+      // Add cache header (but not the internal cache key for security)
       res.set('X-Cache', 'HIT');
-      res.set('X-Cache-Key', cacheKey);
-      
+
       return res.json(cachedResponse);
     }
 
@@ -95,10 +94,9 @@ function cacheMiddleware(options = {}) {
       if (shouldCacheResponse) {
         cache.set(cacheKey, body, ttl);
         console.log(`💾 Response cached for ${ttl}s: ${req.path}`);
-        
-        // Add cache header
+
+        // Add cache header (but not the internal cache key for security)
         res.set('X-Cache', 'MISS');
-        res.set('X-Cache-Key', cacheKey);
       } else {
         console.log(`⏭️  Response NOT cached (status: ${res.statusCode}): ${req.path}`);
         res.set('X-Cache', 'SKIP');
