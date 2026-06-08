@@ -39,6 +39,7 @@ const app = require('../../server');
 const Email = require('../../models/Email');
 const User = require('../../models/User');
 const Classification = require('../../models/Classification');
+const cache = require('../../utils/cache');
 
 describe('Email Controller - Unit Tests', () => {
   beforeAll(() => {
@@ -51,6 +52,9 @@ describe('Email Controller - Unit Tests', () => {
   });
 
   beforeEach(() => {
+    // Flush cache to prevent test pollution
+    cache.flush();
+
     // Reset implementations to baseline
     User.findOne.mockResolvedValue({ _id: 'mock-mongo-id', email: 'test@example.com' });
     User.create.mockResolvedValue({ _id: 'mock-mongo-id', email: 'test@example.com' });
