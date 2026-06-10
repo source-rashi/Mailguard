@@ -85,8 +85,9 @@ const validateEnv = () => {
 /**
  * Validates that the ML service is reachable at startup
  * Non-blocking - won't crash the backend if ML service is down
+ * Implements exponential backoff retry logic
  */
-async function validateMLServiceReachability() {
+async function validateMLServiceReachability(maxRetries = 3, initialDelay = 2000) {
     const mlServiceUrl = process.env.ML_SERVICE_URL;
     if (!mlServiceUrl) {
         console.warn('⚠️ ML_SERVICE_URL not set - skipping connectivity check');
@@ -95,40 +96,51 @@ async function validateMLServiceReachability() {
     
     console.log(`🔍 Checking ML service connectivity: ${mlServiceUrl}/health`);
     
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(`${mlServiceUrl}/health`, {
-            method: 'GET',
-            signal: controller.signal,
-            headers: { 'Accept': 'application/json' }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`✅ ML service reachable at ${mlServiceUrl}`);
-            if (data.model_loaded) {
-                console.log(`   Model loaded: ${data.model_loaded}`);
-                console.log(`   Model version: ${data.model_version || 'unknown'}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout per request
+            
+            const response = await fetch(`${mlServiceUrl}/health`, {
+                method: 'GET',
+                signal: controller.signal,
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ ML service reachable at ${mlServiceUrl}`);
+                if (data.model_loaded) {
+                    console.log(`   Model status: LOADED (v${data.model_version || '1.0.0'})`);
+                } else {
+                    console.warn(`   ⚠️ ML service is UP but model is NOT loaded`);
+                }
+                return true;
+            } else {
+                throw new Error(`Service responded with status ${response.status}`);
             }
-            return true;
-        } else {
-            console.warn(`⚠️ ML service responded with status ${response.status} at ${mlServiceUrl}`);
-            return false;
+        } catch (error) {
+            const isLastAttempt = attempt === maxRetries;
+            const errorMessage = error.name === 'AbortError' ? 'Timeout (5s)' : error.message;
+            
+            if (isLastAttempt) {
+                console.error(`❌ ML service connectivity failed after ${maxRetries} attempts.`);
+                console.error(`   URL: ${mlServiceUrl}/health`);
+                console.error(`   Final error: ${errorMessage}`);
+                console.warn(`\n💡 Troubleshooting:`);
+                console.warn(`   1. Ensure ML service is running: cd ml-service && uvicorn app:app --port 8000`);
+                console.warn(`   2. Verify ML_SERVICE_URL in .env is correct`);
+                console.warn(`   3. Check for firewall or networking issues\n`);
+            } else {
+                const delay = initialDelay * Math.pow(2, attempt - 1);
+                console.warn(`⚠️ ML service probe attempt ${attempt} failed: ${errorMessage}. Retrying in ${delay/1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
         }
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            console.warn(`⚠️ ML service timeout after 5 seconds at ${mlServiceUrl}`);
-        } else {
-            console.warn(`⚠️ ML service unreachable at ${mlServiceUrl}: ${error.message}`);
-            console.warn(`   Please ensure ML service is running at: ${mlServiceUrl}`);
-            console.warn(`   You can start it with: cd ml-service && python app.py`);
-        }
-        return false;
     }
+    return false;
 }
 
 // Run connectivity check asynchronously (non-blocking, won't crash backend)
