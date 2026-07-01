@@ -88,7 +88,9 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }))
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173', // Vite dev server
-  'http://localhost:3000'  // Legacy dev port
+  'http://127.0.0.1:5173', // Vite dev server via loopback IP
+  'http://localhost:3000',  // Legacy dev port
+  'http://127.0.0.1:3000'  // Legacy dev port via loopback IP
 ].filter(Boolean); // Remove undefined values
 
 const corsOptions = {
