@@ -87,6 +87,7 @@ exports.classifyEmails = async (req, res) => {
         const result = await Classification.findOneAndUpdate(
           { emailId: email._id },
           {
+            userId,
             prediction: prediction.prediction,
             confidence: prediction.confidence,
             probabilities: prediction.probabilities,
