@@ -69,36 +69,31 @@ api.interceptors.request.use(
   async (config) => {
     // Get the Clerk session token
     try {
-      // Get Clerk instance to access the session
       const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-      
-      // Check if Clerk is configured
+
       if (!clerkPublishableKey) {
         logger.warn('⚠️  Clerk not configured - requests will fail authentication')
         return config
       }
-      
-      // Wait for Clerk to be loaded (with timeout)
-      let waitAttempts = 0
-      while (!window.Clerk && waitAttempts < 50) {
-        await new Promise(resolve => setTimeout(resolve, 100)) // Wait 100ms
-        waitAttempts++
-      }
-      
-      // Check if Clerk loaded successfully
-      if (!window.Clerk) {
-        logger.error('❌ Clerk failed to load after 5 seconds')
-        logger.warn('⚠️  Request will be sent without authentication token')
-        return config
-      }
-      
-      // Get session token
+
+      // Helper to wait for Clerk to be ready with a timeout
+      const waitForClerk = () => new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Clerk load timeout')), 5000)
+        const interval = setInterval(() => {
+          if (window.Clerk) {
+            clearTimeout(timeout)
+            clearInterval(interval)
+            resolve()
+          }
+        }, 100)
+      })
+
+      await waitForClerk()
+
       const token = await window.Clerk.session?.getToken()
-      
-      // If token exists, add to Authorization header
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
-       logger.log('✅ Auth token added to request')
+        logger.log('✅ Auth token added to request')
       } else {
         logger.warn('⚠️  No Clerk session token available - user may not be authenticated')
       }

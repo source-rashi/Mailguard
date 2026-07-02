@@ -1,8 +1,10 @@
 // Email Routes
 // API endpoints for email classification
-const csrf = require('csurf');
-const csrfProtection = csrf({ cookie: true });
+// Updated: Replaced deprecated csurf with helmet + custom CSRF middleware
 const express = require('express');
+const helmet = require('helmet');
+// Custom CSRF protection using double-submit cookie pattern
+const csrfProtection = require('../middleware/csrfProtection');
 const router = express.Router();
 const emailController = require('../controllers/emailController');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -11,6 +13,9 @@ const { validate, schemas } = require('../middleware/validation');
 const { cacheMiddleware, invalidateCacheMiddleware, cachePresets } = require('../middleware/cacheMiddleware');
 const { classifyLimiter, bulkOperationLimiter } = require('../middleware/rateLimiter');
 const { invalidateAnalyticsCache } = require('../middleware/analyticsCache');
+
+// Apply security headers globally for email routes
+router.use(helmet());
 
 // All email routes require authentication and user sync
 router.use(authMiddleware);
@@ -23,8 +28,7 @@ router.use(syncUserMiddleware);
  */
 router.get('/csrf-token', (req, res) => {
   try {
-    // Generate CSRF token using the csurf middleware token method
-    const token = req.csrfToken();
+    const token = csrfProtection.generateToken(req, res);
 
     res.json({
       success: true,
@@ -42,7 +46,7 @@ router.get('/csrf-token', (req, res) => {
 
 // Classify all unclassified emails
 // INVALIDATES: User cache and analytics cache after classification completes
-router.post('/classify', csrfProtection,
+router.post('/classify', csrfProtection.middleware,
   classifyLimiter, 
   validate(schemas.classifyEmails), 
   invalidateCacheMiddleware(cachePresets.user),
@@ -52,14 +56,14 @@ router.post('/classify', csrfProtection,
 
 // Get classification statistics
 // CACHED: 3 minutes (stats change infrequently)
-router.get('/stats', csrfProtection,
+router.get('/stats', csrfProtection.middleware,
   cacheMiddleware(cachePresets.stats), 
   emailController.getClassificationStats
 );
 
 // Get all emails (alias for /classified for backward compatibility)
 // CACHED: 5 minutes with pagination awareness
-router.get('/', csrfProtection, 
+router.get('/', csrfProtection.middleware, 
   validate(schemas.emailQuery, 'query'), 
   cacheMiddleware(cachePresets.emailList),
   emailController.getClassifiedEmails
@@ -67,7 +71,7 @@ router.get('/', csrfProtection,
 
 // Get classified emails
 // CACHED: 5 minutes with pagination awareness
-router.get('/classified', csrfProtection, 
+router.get('/classified', csrfProtection.middleware, 
   validate(schemas.emailQuery, 'query'), 
   cacheMiddleware(cachePresets.emailList),
   emailController.getClassifiedEmails
@@ -75,7 +79,7 @@ router.get('/classified', csrfProtection,
 
 // Delete a single email
 // INVALIDATES: User cache after deletion
-router.delete('/:id', csrfProtection, 
+router.delete('/:id', csrfProtection.middleware, 
   validate(schemas.idParam, 'params'), 
   invalidateCacheMiddleware(), // Clear user cache after delete
   emailController.deleteEmail
@@ -83,7 +87,7 @@ router.delete('/:id', csrfProtection,
 
 // Bulk delete multiple emails
 // INVALIDATES: User cache after bulk deletion
-router.post('/bulk-delete', csrfProtection, 
+router.post('/bulk-delete', csrfProtection.middleware, 
   bulkOperationLimiter, 
   validate(schemas.bulkOperation), 
   invalidateCacheMiddleware(), // Clear user cache after bulk delete
@@ -92,7 +96,7 @@ router.post('/bulk-delete', csrfProtection,
 
 // Auto clean all phishing emails
 // INVALIDATES: User cache after cleaning phishing emails
-router.post('/clean-phishing', csrfProtection, 
+router.post('/clean-phishing', csrfProtection.middleware, 
   bulkOperationLimiter, 
   invalidateCacheMiddleware(), // Clear user cache after clean
   emailController.cleanPhishingEmails
@@ -100,7 +104,7 @@ router.post('/clean-phishing', csrfProtection,
 
 // Clear all emails from database
 // INVALIDATES: User cache after clearing all emails
-router.post('/clear-all', csrfProtection, 
+router.post('/clear-all', csrfProtection.middleware, 
   bulkOperationLimiter, 
   invalidateCacheMiddleware(), // Clear user cache after clear
   emailController.clearAllEmails
