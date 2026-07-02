@@ -196,10 +196,10 @@ if (require.main === module) {
     console.log(`✅ Server is running on http://localhost:${PORT}`);
     
     // Initialize automatic retraining scheduler
-    // startScheduler();
+    startScheduler();
     
     // Initialize nightly email scan and cleanup job
-    // startScanJob();
+    startScanJob();
   });
 
   server.on('error', (error) => {
