@@ -192,8 +192,7 @@ const PORT = process.env.PORT || 5000;
 
 // Start the server only if this file is run directly (not required as a module)
 if (require.main === module) {
-  // Start the server and listen on specified port
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`✅ Server is running on http://localhost:${PORT}`);
     
     // Initialize automatic retraining scheduler
@@ -201,6 +200,17 @@ if (require.main === module) {
     
     // Initialize nightly email scan and cleanup job
     // startScanJob();
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Error: Port ${PORT} is already in use.`);
+      console.error(`   Please stop the other process or configure a different PORT in .env.`);
+      process.exit(1);
+    } else {
+      console.error('❌ Server startup error:', error);
+      process.exit(1);
+    }
   });
 }
 
