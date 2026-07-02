@@ -208,15 +208,7 @@ async function classifyEmails(emailObjects) {
   }
 }
 
-module.exports = {
-  predictEmail,
-  predictEmailsBatch,
-  classifyEmails,
-  checkHealth,
-  getServiceInfo,
-  classifyEmail,
-  metrics
-};
+// Exports moved to the end of the file
 
 // backend/services/mlService.js
 
@@ -306,9 +298,35 @@ async function callMLWithRetry(mlFn, ...args) {
   }
 }
 
+// Raw classification function that handles input data parsing and calls predictEmail
+async function originalMLClassifyFn(emailData) {
+  const text = typeof emailData === 'string'
+    ? emailData
+    : `${emailData.subject || ''} ${emailData.body || ''}`.trim();
+  
+  const result = await predictEmail(text);
+  
+  return {
+    label: result.prediction,
+    confidence: result.confidence,
+    probabilities: result.probabilities,
+    explanation: result.explanation,
+    modelVersion: result.modelVersion
+  };
+}
+
 // Export wrapper around your existing classify function
 async function classifyEmail(emailData) {
   return callMLWithRetry(originalMLClassifyFn, emailData);
 }
 
-// Exports consolidated above
+// Exports
+module.exports = {
+  predictEmail,
+  predictEmailsBatch,
+  classifyEmails,
+  checkHealth,
+  getServiceInfo,
+  classifyEmail,
+  metrics
+};
