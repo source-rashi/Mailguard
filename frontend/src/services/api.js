@@ -407,5 +407,25 @@ export const getMigrationStatus = async () => {
   }
 }
 
-// Export the axios instance for custom requests
+// Auto-delete preferences endpoints
+export const getAutoDeletePreferences = async () => {
+  try {
+    const response = await api.get('/deletion/preferences')
+    return response.data
+  } catch (error) {
+    logger.error('❌ Failed to get auto-delete preferences:', error)
+    throw error
+  }
+}
+
+export const updateAutoDeletePreferences = async (prefs) => {
+  try {
+    const response = await api.put('/deletion/preferences', prefs)
+    return response.data
+  } catch (error) {
+    logger.error('❌ Failed to update auto-delete preferences:', error)
+    throw error
+  }
+}
+
 export default api

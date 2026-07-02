@@ -21,7 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, clearAllEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus, getFeedback, triggerRetrain, getRetrainStatus } from '../services/api'
+import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, clearAllEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus, getFeedback, triggerRetrain, getRetrainStatus, getAutoDeletePreferences, updateAutoDeletePreferences } from '../services/api'
+import api from '../services/api'
 
 // Lazy load heavy components for better initial load performance
 const EmailTable = lazy(() => import('../components/EmailTable'))
@@ -77,6 +78,11 @@ function Dashboard() {
   // Gmail connection state
   const [fetchingEmails, setFetchingEmails] = useState(false)
   const [gmailConnected, setGmailConnected] = useState(false)
+
+  // Auto‑delete preferences state
+  const [autoDeleteEnabled, setAutoDeleteEnabled] = useState(false)
+  const [retentionDays, setRetentionDays] = useState(30)
+  const [prefLoading, setPrefLoading] = useState(true)
 
   // Migration state
   const [migrationNeeded, setMigrationNeeded] = useState(false)
@@ -141,13 +147,28 @@ function Dashboard() {
     })
   }
 
-  // Fetch stats and emails on component mount
+  // Fetch stats, emails, and preferences on component mount
   useEffect(() => {
     fetchStats()
     fetchEmails()
     checkGmailConnection()
     checkMigrationStatus()
     fetchFeedbackStats() // NEW: Load feedback stats
+
+    // Load auto‑delete preferences
+    const loadPrefs = async () => {
+      try {
+        setPrefLoading(true)
+        const data = await getAutoDeletePreferences()
+        setAutoDeleteEnabled(data.enabled)
+        setRetentionDays(data.retentionDays)
+      } catch (err) {
+        toast.error('Failed to load auto‑delete preferences')
+      } finally {
+        setPrefLoading(false)
+      }
+    }
+    loadPrefs()
     
     // Check for Gmail connection status in URL
     const urlParams = new URLSearchParams(window.location.search)
@@ -548,7 +569,7 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
   }
   
   // Handle clearing all emails from database
-  const handleClearAllEmails = () => {
+  const handleClearAllEmails = async () => {
     openConfirmDialog({
       title: 'Clear All Emails',
       description: 'This will permanently delete ALL emails from the database (not from Gmail). This action cannot be undone. Are you sure?',
@@ -582,6 +603,21 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
     } catch (err) {
       console.error('❌ Failed to initiate Gmail auth:', err)
       toast.error('Failed to connect Gmail. Please try again.')
+    }
+  }
+
+  const handleDisconnectGmail = async () => {
+    try {
+      const token = await window.Clerk.session?.getToken()
+      const response = await api.delete('/gmail/disconnect', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      console.log('✅ Gmail disconnected:', response)
+      setGmailConnected(false)
+      toast.success('Gmail disconnected successfully.')
+    } catch (err) {
+      console.error('❌ Failed to disconnect Gmail:', err)
+      toast.error('Failed to disconnect Gmail. Please try again.')
     }
   }
   
@@ -618,197 +654,100 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
             description: 'All fetched emails were new. Would you like to fetch more?',
             variant: 'default',
             onConfirm: async () => {
-              await handleFetchEmails(true)
+              await runFetchEmails()
             }
           })
+          return;
         }
       } catch (err) {
-        console.error('❌ Failed to fetch emails:', err)
-        
-        // Check if Gmail not connected
-        if (err.response?.status === 400) {
-          toast.error('Gmail not connected. Please connect your Gmail account first.')
-        } else {
-          toast.error('Failed to fetch emails. Please try again.')
-        }
+        console.error('❌ Failed to fetch/classify emails:', err)
+        toast.error('Failed to fetch/classify emails. Please try again.')
       } finally {
         setFetchingEmails(false)
       }
     }
-
-    if (!skipConfirm && !showFetchOptions) {
-      openConfirmDialog({
-        title: 'Fetch & Scan Emails',
-        description: 'Fetch latest emails from Gmail and scan for phishing?',
-        variant: 'default',
-        onConfirm: async () => {
-          await runFetchEmails()
-        }
-      })
-      return
-    }
-
+    
     await runFetchEmails()
   }
 
   return (
-    <div className="space-y-6">
-      {/* Migration Warning Banner */}
-      {migrationLoading ? (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
-              <div className="space-y-2">
-                <div className="h-5 bg-gray-200 rounded w-48"></div>
-                <div className="h-4 bg-gray-200 rounded w-96"></div>
-              </div>
-            </div>
-            <div className="w-28 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-        </div>
-      ) : migrationNeeded && (
-        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-yellow-100 rounded-lg flex-shrink-0">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-900 mb-1">⚠️ Email Migration Required</h3>
-                <p className="text-sm text-yellow-700">
-                  {migrationCount > 0 ? `You have ${migrationCount} existing email(s) that need ` : 'Your existing emails need '}
-                  to be migrated to your new Clerk account. Click "Fix Now" to update ownership.
-                </p>
-              </div>
-            </div>
-            <div className="flex space-x-3 w-full sm:w-auto">
-              <button
-                onClick={checkMigrationStatus}
-                disabled={migrating}
-                title="Retry check"
-                className={`px-4 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
-                  migrating
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-              <button
-                onClick={handleMigrateEmails}
-                disabled={migrating}
-                className={`flex-1 sm:flex-none px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
-                  migrating
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-md'
-                }`}
-              >
-                {migrating ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Migrating...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Fix Now</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-        
-        {/* Gmail Connection Section */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 sm:p-6 transition-all duration-300 hover:border-slate-600 hover:shadow-lg hover:shadow-blue-500/5">
-          <div className="flex flex-col gap-4">
-            {/* Main Connection Info */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="p-2 sm:p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 flex-shrink-0">
-                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg sm:text-xl font-semibold text-slate-100">Gmail Integration</h3>
-                    {gmailConnected && (
-                      <span className="px-2 sm:px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-xs text-emerald-400 font-semibold">
-                        ✓ Connected
-                      </span>
-                    )}
+        <div className="space-y-6">
+          {/* Migration Warning Banner */}
+          {migrationLoading ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                  <div className="space-y-2">
+                    <div className="h-5 bg-gray-200 rounded w-48"></div>
+                    <div className="h-4 bg-gray-200 rounded w-96"></div>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-400">
-                    {gmailConnected ? 'Fetch real-time emails and scan for phishing threats' : 'Connect your Gmail to scan and protect your inbox'}
-                  </p>
                 </div>
+                <div className="w-28 h-12 bg-gray-200 rounded-lg"></div>
               </div>
-            <div className="flex flex-wrap gap-2 sm:gap-4 w-full sm:w-auto">
-              {!gmailConnected ? (
-                <button
-                  onClick={handleConnectGmail}
-                  className="flex-1 sm:flex-none px-4 sm:px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span>Connect Gmail</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowFetchOptions(!showFetchOptions)}
-                    className="flex-1 sm:flex-none px-4 sm:px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base border border-slate-600"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </div>
+          ) : migrationNeeded && (
+            <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-yellow-100 rounded-lg flex-shrink-0">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <span>Fetch Options</span>
-                  </button>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-yellow-900 mb-1">⚠️ Email Migration Required</h3>
+                    <p className="text-sm text-yellow-700">
+                      {migrationCount > 0 ? `You have ${migrationCount} existing email(s) that need ` : 'Your existing emails need '}
+                      to be migrated to your new Clerk account. Click "Fix Now" to update ownership.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex space-x-3 w-full sm:w-auto">
                   <button
-                    onClick={handleFetchEmails}
-                    disabled={fetchingEmails}
-                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base ${
-                      fetchingEmails
-                        ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 hover:shadow-emerald-500/30'
+                    onClick={checkMigrationStatus}
+                    disabled={migrating}
+                    title="Retry check"
+                    className={`px-4 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
+                      migrating
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
                     }`}
                   >
-                    {fetchingEmails ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleMigrateEmails}
+                    disabled={migrating}
+                    className={`flex-1 sm:flex-none px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
+                      migrating
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-md'
+                    }`}
+                  >
+                    {migrating ? (
                       <>
                         <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span className="hidden sm:inline">Fetching...</span>
-                        <span className="sm:hidden">...</span>
+                        <span>Migrating...</span>
                       </>
                     ) : (
                       <>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span className="hidden sm:inline">Fetch & Scan</span>
-                        <span className="sm:hidden">Fetch</span>
+                        <span>Fix Now</span>
                       </>
                     )}
                   </button>
-                </>
-              )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
           
           {/* OLD EMAILS WARNING BANNER */}
           {stats.total > 0 && (
@@ -967,8 +906,6 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
               </div>
             </div>
           )}
-          </div>
-        </div>
 
         {/* Reinforcement Learning Section */}
         <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-xl border border-purple-500/30 p-4 sm:p-6 transition-all duration-300 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10">
@@ -1096,6 +1033,78 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 sm:gap-4">
+          {/* Gmail Connection Controls */}
+          {gmailConnected ? (
+            <button
+              onClick={() => openConfirmDialog({
+                title: 'Disconnect Gmail',
+                description: 'Are you sure you want to disconnect your Gmail account? This will stop email fetching.',
+                onConfirm: async () => {
+                  await handleDisconnectGmail()
+                },
+                variant: 'destructive',
+              })}
+              className="px-4 sm:px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold transition-all duration-200 flex items-center space-x-2 min-h-[44px]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7" />
+              </svg>
+              Disconnect Gmail
+            </button>
+          ) : (
+            <button
+              onClick={handleConnectGmail}
+              className="px-4 sm:px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition-all duration-200 flex items-center space-x-2 min-h-[44px]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Connect Gmail
+            </button>
+          )}
+
+          {/* Auto‑Delete Settings */}
+          <div className="flex items-center space-x-4 bg-slate-800 p-4 rounded-xl border border-slate-600">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={autoDeleteEnabled}
+                disabled={prefLoading}
+                onChange={e => setAutoDeleteEnabled(e.target.checked)}
+                className="w-5 h-5 text-indigo-600 bg-slate-700 border-slate-600 rounded"
+              />
+              <span className="text-sm text-slate-200">Enable Auto‑Delete</span>
+            </label>
+            <label className="flex items-center space-x-2">
+              <span className="text-sm text-slate-200">Retention Days:</span>
+              <input
+                type="number"
+                min="1" max="90"
+                value={retentionDays}
+                disabled={prefLoading}
+                onChange={e => setRetentionDays(parseInt(e.target.value) || 30)}
+                className="w-16 px-2 py-1 bg-slate-700 text-slate-200 border border-slate-600 rounded"
+              />
+              <button
+                onClick={async () => {
+                  try {
+                    setPrefLoading(true)
+                    await updateAutoDeletePreferences({ enabled: autoDeleteEnabled, retentionDays })
+                    toast.success('Auto‑delete preferences saved')
+                  } catch (err) {
+                    toast.error('Failed to save preferences')
+                  } finally {
+                    setPrefLoading(false)
+                  }
+                }}
+                disabled={prefLoading}
+                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded"
+              >
+                Save
+              </button>
+            </label>
+          </div>
+
           {/* Bulk Delete Button */}
           <button
             onClick={handleBulkDelete}
