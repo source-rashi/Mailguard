@@ -213,7 +213,9 @@ module.exports = {
   predictEmailsBatch,
   classifyEmails,
   checkHealth,
-  getServiceInfo
+  getServiceInfo,
+  classifyEmail,
+  metrics
 };
 
 // backend/services/mlService.js
@@ -309,4 +311,4 @@ async function classifyEmail(emailData) {
   return callMLWithRetry(originalMLClassifyFn, emailData);
 }
 
-module.exports = { classifyEmail, metrics };
+// Exports consolidated above
