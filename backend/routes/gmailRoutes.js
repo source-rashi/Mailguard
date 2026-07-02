@@ -24,14 +24,14 @@ const { invalidateCacheMiddleware } = require('../middleware/cacheMiddleware');
  * All routes are prefixed with /api/gmail (defined in server.js)
  */
 
-/**
- * @route   GET /api/gmail/auth
- * @desc    Initiate Gmail OAuth flow (get authorization URL)
- * @access  Protected (requires JWT token)
- * @header  Authorization: Bearer <token>
- * @returns Authorization URL to redirect user to Google consent screen
- */
-router.get('/auth', timeout('30s'), authMiddleware, syncUserMiddleware, initiateGmailAuth);
+  /**
+   * @route   POST /api/gmail/auth/initiate
+   * @desc    Initiate Gmail OAuth flow (get authorization URL)
+   * @access  Protected (requires JWT token)
+   * @header  Authorization: Bearer <token>
+   * @returns Authorization URL to redirect user to Google consent screen
+   */
+router.post('/auth/initiate', timeout('30s'), authMiddleware, syncUserMiddleware, initiateGmailAuth);
 
 /**
  * @route   GET /api/gmail/callback

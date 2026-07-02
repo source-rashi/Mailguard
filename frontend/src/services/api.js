@@ -322,7 +322,7 @@ export const getRetrainStatus = async () => {
  */
 export const initiateGmailAuth = async () => {
   try {
-    const response = await api.get('/gmail/auth')
+    const response = await api.post('/gmail/auth/initiate')
     return response.data
   } catch (error) {
     logger.error('❌ Failed to initiate Gmail auth:', error)
