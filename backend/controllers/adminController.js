@@ -163,7 +163,7 @@ exports.triggerRetraining = async (req, res) => {
                 '--output', TRAINING_DATA
             ];
 
-            const pythonProcess = spawn('python', args, {
+            const pythonProcess = spawn(process.env.PYTHON_BIN || 'python', args, {
                 cwd: path.join(__dirname, '../../ml-service')
             });
 
@@ -208,7 +208,7 @@ exports.triggerRetraining = async (req, res) => {
                 '--model', MODEL_TYPE
             ];
 
-            const pythonProcess = spawn('python', args, {
+            const pythonProcess = spawn(process.env.PYTHON_BIN || 'python', args, {
                 cwd: path.join(__dirname, '../../ml-service')
             });
 
@@ -382,7 +382,7 @@ exports.buildDataset = async (req, res) => {
 
             console.log(`   Command: python ${args.join(' ')}`);
 
-            const pythonProcess = spawn('python', args, {
+            const pythonProcess = spawn(process.env.PYTHON_BIN || 'python', args, {
                 cwd: path.join(__dirname, '../../ml-service')
             });
 
