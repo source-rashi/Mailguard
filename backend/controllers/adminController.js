@@ -5,6 +5,8 @@ const { spawn } = require('child_process');
 const axios = require('axios');
 const path = require('path');
 
+const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+
 // ============================================
 // ML OPERATION LOCK & STATUS TRACKING
 // ============================================
@@ -163,7 +165,7 @@ exports.triggerRetraining = async (req, res) => {
                 '--output', TRAINING_DATA
             ];
 
-            const pythonProcess = spawn(process.env.PYTHON_BIN || 'python', args, {
+            const pythonProcess = spawn(PYTHON_BIN, args, {
                 cwd: path.join(__dirname, '../../ml-service')
             });
 
@@ -208,7 +210,7 @@ exports.triggerRetraining = async (req, res) => {
                 '--model', MODEL_TYPE
             ];
 
-            const pythonProcess = spawn(process.env.PYTHON_BIN || 'python', args, {
+            const pythonProcess = spawn(PYTHON_BIN, args, {
                 cwd: path.join(__dirname, '../../ml-service')
             });
 
