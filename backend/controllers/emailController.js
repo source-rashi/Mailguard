@@ -85,14 +85,20 @@ exports.classifyEmails = async (req, res) => {
         // Save or update classification in database
         // Use findOneAndUpdate with upsert to handle both new and existing classifications
         const result = await Classification.findOneAndUpdate(
-          { emailId: email._id },
+          { emailId: email._id, userId },
           {
-            userId,
-            prediction: prediction.prediction,
-            confidence: prediction.confidence,
-            probabilities: prediction.probabilities,
-            explanation: prediction.explanation,
-            createdAt: new Date() // Update timestamp
+            $set: {
+              userId,
+              prediction: prediction.prediction,
+              confidence: prediction.confidence,
+              probabilities: prediction.probabilities,
+              explanation: prediction.explanation,
+              createdAt: new Date() // Update timestamp
+            },
+            $setOnInsert: {
+              emailId: email._id,
+              userId
+            }
           },
           {
             upsert: true, // Create if doesn't exist
