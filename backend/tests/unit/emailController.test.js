@@ -10,9 +10,11 @@ jest.mock('../../services/mlService', () => ({
     explanation: { top_signals: [], method: 'tfidf' }
   })
 }));
-jest.mock('csurf', () => {
-  return () => (req, res, next) => next();
-});
+jest.mock('../../middleware/csrfProtection', () => ({
+  generateToken: jest.fn().mockReturnValue('test-csrf-token'),
+  middleware: (req, res, next) => next(),
+}));
+
 jest.mock('@clerk/clerk-sdk-node', () => ({
   clerkClient: {
     verifyToken: jest.fn().mockResolvedValue({ sub: 'test-user-id' }),

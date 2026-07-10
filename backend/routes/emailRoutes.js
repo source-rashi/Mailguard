@@ -44,69 +44,69 @@ router.get('/csrf-token', (req, res) => {
   }
 });
 
-// Classify all unclassified emails
-// INVALIDATES: User cache and analytics cache after classification completes
-router.post('/classify', csrfProtection.middleware,
-  classifyLimiter, 
-  validate(schemas.classifyEmails), 
-  invalidateCacheMiddleware(cachePresets.user),
-  invalidateAnalyticsCache,
-  emailController.classifyEmails
-);
-
 // Get classification statistics
-// CACHED: 3 minutes (stats change infrequently)
-router.get('/stats', csrfProtection.middleware,
-  cacheMiddleware(cachePresets.stats), 
+// CACHED: 3 minutes — GET is a safe/idempotent method, no CSRF guard needed
+router.get('/stats',
+  cacheMiddleware(cachePresets.stats),
   emailController.getClassificationStats
 );
 
 // Get all emails (alias for /classified for backward compatibility)
-// CACHED: 5 minutes with pagination awareness
-router.get('/', csrfProtection.middleware, 
-  validate(schemas.emailQuery, 'query'), 
+// CACHED: 5 minutes — GET is safe, no CSRF guard needed
+router.get('/',
+  validate(schemas.emailQuery, 'query'),
   cacheMiddleware(cachePresets.emailList),
   emailController.getClassifiedEmails
 );
 
 // Get classified emails
-// CACHED: 5 minutes with pagination awareness
-router.get('/classified', csrfProtection.middleware, 
-  validate(schemas.emailQuery, 'query'), 
+// CACHED: 5 minutes — GET is safe, no CSRF guard needed
+router.get('/classified',
+  validate(schemas.emailQuery, 'query'),
   cacheMiddleware(cachePresets.emailList),
   emailController.getClassifiedEmails
 );
 
+// Classify all unclassified emails
+// INVALIDATES: User cache and analytics cache after classification completes
+router.post('/classify', csrfProtection.middleware,
+  classifyLimiter,
+  validate(schemas.classifyEmails),
+  invalidateCacheMiddleware(cachePresets.user),
+  invalidateAnalyticsCache,
+  emailController.classifyEmails
+);
+
 // Delete a single email
 // INVALIDATES: User cache after deletion
-router.delete('/:id', csrfProtection.middleware, 
-  validate(schemas.idParam, 'params'), 
-  invalidateCacheMiddleware(), // Clear user cache after delete
+router.delete('/:id', csrfProtection.middleware,
+  validate(schemas.idParam, 'params'),
+  invalidateCacheMiddleware(),
   emailController.deleteEmail
 );
 
 // Bulk delete multiple emails
 // INVALIDATES: User cache after bulk deletion
-router.post('/bulk-delete', csrfProtection.middleware, 
-  bulkOperationLimiter, 
-  validate(schemas.bulkOperation), 
-  invalidateCacheMiddleware(), // Clear user cache after bulk delete
+router.post('/bulk-delete', csrfProtection.middleware,
+  bulkOperationLimiter,
+  validate(schemas.bulkOperation),
+  invalidateCacheMiddleware(),
   emailController.bulkDeleteEmails
 );
 
 // Auto clean all phishing emails
 // INVALIDATES: User cache after cleaning phishing emails
-router.post('/clean-phishing', csrfProtection.middleware, 
-  bulkOperationLimiter, 
-  invalidateCacheMiddleware(), // Clear user cache after clean
+router.post('/clean-phishing', csrfProtection.middleware,
+  bulkOperationLimiter,
+  invalidateCacheMiddleware(),
   emailController.cleanPhishingEmails
 );
 
 // Clear all emails from database
 // INVALIDATES: User cache after clearing all emails
-router.post('/clear-all', csrfProtection.middleware, 
-  bulkOperationLimiter, 
-  invalidateCacheMiddleware(), // Clear user cache after clear
+router.post('/clear-all', csrfProtection.middleware,
+  bulkOperationLimiter,
+  invalidateCacheMiddleware(),
   emailController.clearAllEmails
 );
 
