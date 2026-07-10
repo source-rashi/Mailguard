@@ -23,6 +23,7 @@ const logger = {
 };
 
 import { z } from 'zod';
+import { getAuthToken } from './authToken';
 
 const EmailSchema = z.object({
   id: z.string().or(z.number()),
@@ -69,28 +70,7 @@ api.interceptors.request.use(
   async (config) => {
     // Get the Clerk session token
     try {
-      const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-
-      if (!clerkPublishableKey) {
-        logger.warn('⚠️  Clerk not configured - requests will fail authentication')
-        return config
-      }
-
-      // Helper to wait for Clerk to be ready with a timeout
-      const waitForClerk = () => new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Clerk load timeout')), 5000)
-        const interval = setInterval(() => {
-          if (window.Clerk) {
-            clearTimeout(timeout)
-            clearInterval(interval)
-            resolve()
-          }
-        }, 100)
-      })
-
-      await waitForClerk()
-
-      const token = await window.Clerk.session?.getToken()
+      const token = await getAuthToken()
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
         logger.log('✅ Auth token added to request')

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { useUser, useClerk } from '@clerk/clerk-react'
+import { useUser, useClerk, useAuth } from '@clerk/clerk-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -51,6 +51,7 @@ function ComponentLoader() {
 function Dashboard() {
   const { user } = useUser()
   const { signOut } = useClerk()
+  const { getToken } = useAuth()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'User'
   
   // Stats state
@@ -236,11 +237,12 @@ function Dashboard() {
   
   const checkGmailConnection = async () => {
     try {
-     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+      const token = await getToken()
 
-const response = await fetch(`${API_BASE}/gmail/status`, {
+      const response = await fetch(`${API_BASE}/gmail/status`, {
         headers: {
-          'Authorization': `Bearer ${await window.Clerk.session?.getToken()}`
+          Authorization: `Bearer ${token}`
         }
       })
       const data = await response.json()
@@ -608,10 +610,7 @@ const response = await fetch(`${API_BASE}/gmail/status`, {
 
   const handleDisconnectGmail = async () => {
     try {
-      const token = await window.Clerk.session?.getToken()
-      const response = await api.delete('/gmail/disconnect', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await api.delete('/gmail/disconnect')
       console.log('✅ Gmail disconnected:', response)
       setGmailConnected(false)
       toast.success('Gmail disconnected successfully.')

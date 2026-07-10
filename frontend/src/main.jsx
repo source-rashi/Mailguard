@@ -9,6 +9,7 @@ import { createRoot } from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { Toaster } from '@/components/ui/sonner'
 import ErrorBoundary from './components/ErrorBoundary'
+import ClerkTokenBridge from './components/auth/ClerkTokenBridge'
 import './index.css'
 import App from './App.jsx'
 
@@ -41,6 +42,7 @@ function DarkModeApp() {
 
   return (
     <ErrorBoundary>
+      <ClerkTokenBridge />
       <App />
       <Toaster position="top-right" richColors closeButton expand visibleToasts={5} />
     </ErrorBoundary>
