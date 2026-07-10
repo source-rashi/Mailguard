@@ -60,8 +60,14 @@ const connectDB = async (retries = 5, retryDelay = 5000) => {
         console.error('  3. Ensure MongoDB is accessible on the specified host/port');
         console.error('  4. Check firewall/network settings');
         console.error(`  5. Current URI: ${process.env.MONGO_URI.replace(/\/\/.*:.*@/, '//***:***@')}`);
-        console.error('\nExiting application...\n');
-        process.exit(1);
+        if (process.env.NODE_ENV === 'production') {
+          console.error('\nExiting application...\n');
+          process.exit(1);
+        }
+
+        console.warn('\n⚠️ Continuing without a database connection in non-production mode.');
+        console.warn('   The API will stay online, but database-backed routes will fail until MongoDB is reachable.\n');
+        return null;
       }
     }
   }
