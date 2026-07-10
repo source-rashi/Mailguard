@@ -7,15 +7,15 @@ const CURRENT_VERSION = 'v1';
 // Validation and key generation
 function getEncryptionKey() {
   const envKey = process.env.ENCRYPTION_KEY;
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const allowDevelopmentFallback = process.env.NODE_ENV === 'development';
 
   if (!envKey) {
-    if (!isDevelopment) {
+    if (!allowDevelopmentFallback) {
       throw new Error('ENCRYPTION_KEY is required unless NODE_ENV is development');
     }
 
-    // Development Fallback
-    console.warn('⚠️  WARNING: ENCRYPTION_KEY not set. Using insecure development key - DO NOT USE OUTSIDE DEVELOPMENT!');
+    // Development-only fallback keeps local runs working without weakening production startup.
+    console.warn('⚠️  WARNING: ENCRYPTION_KEY not set. Using deterministic development-only fallback - DO NOT USE OUTSIDE DEVELOPMENT!');
     // Use a hashed value as fallback so it works consistently across reboots,
     // but is explicitly warned against for production use.
     return crypto.createHash('sha256').update('dev-only-mailguard-key').digest();
